@@ -1,0 +1,63 @@
+
+
+
+
+(Todos estos resultados se hicieron con el Blast antiguo, pero sirve para ver si hay algún problema)
+
+
+grep -A 1 "hits found" ~/TFM/virus_genomes.blast | grep contigs | cut -f 2 | wc -l
+Resultado: 27710. Este es el número total de hits (limitado a 1)
+
+grep -A 1 "hits found" ~/TFM/virus_genomes.blast | grep contigs | cut -f 2 | sort -u | wc -l
+Resultado: 2665. Este es el número de secuencias DISTINTAS que han dado hit
+
+grep -A 1 "hits found" ~/TFM/virus_genomes.blast | grep contigs | cut -f 2 | sort -u > ~/TFM/blast_sequences_names.txt
+Sacamos los nombres de las secuencias para ver si todas están en nuestros metadatos
+
+cut -f 1 virus_genomes_metadata.tsv > virus_genomes_id.txt
+Sacamos los nombres de las secuencias de los metadatos
+
+grep -cf ~/TFM/blast_sequences_names.txt virus_genomes_id.txt
+Resultado: 6256. Al parecer, hay más de 20000 entradas de los resultados que no están en nuestros metadatos.
+
+grep -f ~/TFM/blast_sequences_names.txt virus_genomes_id.txt | sort -u | wc -l
+Resultado: 2572. Así vemos que en realidad la mayoría de secuencias dan hit, pero hay unas pocas que se repiten bastante que no salen en nuestros metadatos.
+
+
+Ahora probamos a ver qué secuencias son las que no dan hit:
+
+
+grep -f ~/TFM/blast_sequences_names.txt virus_genomes_id.txt > blast_known_sequences.txt
+grep -vf blast_known_sequences.txt ~/TFM/blast_sequences_names.txt | sort -u | wc -l
+Resultado: 100. No cuadra pero veremos qué secuencias son estas.
+
+grep -vf blast_known_sequences.txt ~/TFM/blast_sequences_names.txt
+Todas las secuencias que no aparecen en nuestros metadatos tienen el prefijo REF:. Por el formato, además, son todas del IMG/VR DB.
+
+grep -vf blast_known_sequences.txt ~/TFM/blast_sequences_names.txt > unknown_blast_sequences.txt
+Sacamos las secuencias sospechosas
+
+grep -f unknown_blast_sequences.txt virus_genomes_id.txt
+grep -f unknown_blast_sequences.txt virus_genomes_metadata.tsv
+Confirmamos que por lo menos tal cual los nombres no aparecen en nuestros metadatos
+
+
+sed 's/REF://g' unknown_blast_sequences.txt > processed_unknown_blast_sequences.txt
+Quitamos la parte sospechosa de las IDs
+
+grep -cf processed_unknown_blast_sequences.txt virus_genomes_id.txt
+Resultado: 100. En principio parece que era cuestión de formato.
+
+
+Hacemos doble comprobación:
+
+sed -i 's/REF://g' ~/TFM/blast_sequences_names.txt
+Resultado: 6356. ¿¿??
+
+grep -cf virus_genomes_id.txt ~/TFM/blast_sequences_names.txt
+Hacemos una búsqueda inversa, de todos los ids posibles contra los ids que tenemos.
+Parece que el programa no es capaz de manejar el archivo grande. Probamos otra aproximación:
+
+for id in $(cat virus_genomes_id.txt); do grep $id ~/TFM/blast_sequences_names.txt > reverse_grep_results.txt; done
+wc -l reverse_grep_results.txt
+Extraemos las secuencias que están en los hits y en los metadatos.
